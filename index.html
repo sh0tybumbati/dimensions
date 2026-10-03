@@ -82,12 +82,14 @@ body{background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-
   .tag{font-size:10px;gap:.6rem}
 }
 @media (prefers-reduced-motion:reduce){.cue::after{animation:none}}
+#cut{position:fixed;inset:0;z-index:9;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .22s ease}
 noscript{position:fixed;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;z-index:99;background:var(--bg)}
 </style>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
 <noscript>This page is a scroll-driven animation and needs JavaScript.</noscript>
+<div id="cut"></div>
 <nav class="rail" id="rail" aria-label="Chapters"></nav>
 <div class="auto" id="auto">
   <button id="auto-play" aria-pressed="false" title="Scroll for me (space)">▶ Auto-scroll</button>
@@ -855,14 +857,30 @@ addEventListener('keydown', e => {
   else if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(e.key)) stop();
 });
 
+const cut = document.getElementById('cut');
+let cutting = false;
+function cutTo(c) {
+  cutting = true; cut.style.opacity = 1;
+  setTimeout(() => {
+    c.sp = c.p = 0; scrollTo(0, c.el.offsetTop); acc = 0;
+    cut.style.opacity = 0;
+    setTimeout(() => { cutting = false; }, 120);
+  }, 240);
+}
+
 let last = performance.now(), T = 0;
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (!RM) T += dt;
-  if (auto) {
+  if (auto && !cutting) {
     acc += BASE * SPEEDS[speedI] * dt; const d = Math.floor(acc);
     if (d) { acc -= d; scrollBy(0, d); }
     if (scrollY >= document.documentElement.scrollHeight - innerHeight - 1) setAuto(false);
+    else {
+      // at the end of a chapter, cut to the next one instead of scrolling through the slide-up
+      const i = chapters.findIndex(c => c.sized && c.p >= .998);
+      if (i >= 0 && i < chapters.length - 1) cutTo(chapters[i + 1]);
+    }
   }
   const vh = innerHeight; let active = chapters[0];
   for (const c of chapters) {
